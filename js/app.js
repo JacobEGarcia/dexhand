@@ -366,7 +366,7 @@ function flash() {
 
 // ---------- planning + orchestration ----------
 let tables = null;
-S.loadTables('2-tables.bin').then(t => { tables = t; setStatus('READY'); log('solver tables online (2-phase kociemba)'); })
+S.loadTables('2-tables.bin?v=3').then(t => { tables = t; setStatus('READY'); log('solver tables online (2-phase kociemba)'); })
   .catch(e => { setStatus('TABLES FAILED'); log('tables.bin failed to load: ' + e.message); });
 
 function plan() {
