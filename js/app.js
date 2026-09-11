@@ -63,6 +63,13 @@ controls.enableDamping = true; controls.dampingFactor = 0.06;
 controls.autoRotate = true; controls.autoRotateSpeed = 0.55;
 controls.minDistance = 3.5; controls.maxDistance = 20;
 controls.target.set(0, 0.2, 0);
+function fitCamera() { // pull back on narrow/portrait screens so the cube + hand stay framed
+  const a = innerWidth / innerHeight;
+  const r = 10.6 * THREE.MathUtils.clamp(1.1 / a, 1, 1.8);
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  camera.position.copy(controls.target).add(dir.multiplyScalar(r));
+}
+fitCamera();
 
 const key = new THREE.DirectionalLight(0xfff2e0, 3.2);
 key.position.set(5, 8, 6); key.castShadow = true;
@@ -572,4 +579,5 @@ updateNet(); updateClock(); tick();
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  fitCamera();
 });
