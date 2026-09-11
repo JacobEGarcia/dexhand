@@ -6,7 +6,7 @@ import * as C from './cubie.js';
 import * as S from './solver.js';
 
 const $ = (id) => document.getElementById(id);
-const statusEl = $('status'), logEl = $('log'), movesEl = $('moves'), netEl = $('net'), clockEl = $('clock');
+const statusEl = $('status'), logEl = $('log'), movesEl = $('moves'), netEl = $('net'), clockEl = $('clock'), progFill = $('progressFill');
 
 // ---------- audio ----------
 let actx = null, muted = false;
@@ -87,24 +87,30 @@ const cubeGroup = new THREE.Group(); scene.add(cubeGroup);
 const bodyGeo = new RoundedBoxGeometry(0.96, 0.96, 0.96, 4, 0.07);
 const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0x14171c, roughness: 0.42, metalness: 0.25, clearcoat: 0.5 });
 const stickGeo = new RoundedBoxGeometry(0.84, 0.84, 0.055, 2, 0.05);
+const stickMats = {};
+for (const k in CUBE_COLORS) stickMats[k] = new THREE.MeshPhysicalMaterial({
+  color: CUBE_COLORS[k], roughness: 0.25, metalness: 0.05, clearcoat: 0.8, clearcoatRoughness: 0.25 });
 const cubies = [];
-for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
-  const g = new THREE.Group(); g.position.set(x, y, z);
-  const body = new THREE.Mesh(bodyGeo, bodyMat); body.castShadow = true; body.receiveShadow = true; g.add(body);
-  const faces = [[x, 1, 0, 0, 'px'], [x, -1, 0, 0, 'nx'], [y, 0, 1, 0, 'py'], [y, 0, -1, 0, 'ny'], [z, 0, 0, 1, 'pz'], [z, 0, 0, -1, 'nz']];
-  for (const [v, dx, dy, dz, key] of faces) {
-    if (v !== Math.sign(key === 'px' || key === 'py' || key === 'pz' ? 1 : -1) && v !== 0) continue;
-    if ((key[0] === 'p' && v !== 1) || (key[0] === 'n' && v !== -1)) continue;
-    const m = new THREE.Mesh(stickGeo, new THREE.MeshPhysicalMaterial({
-      color: CUBE_COLORS[key], roughness: 0.25, metalness: 0.05, clearcoat: 0.8, clearcoatRoughness: 0.25 }));
-    m.position.set(dx * 0.5, dy * 0.5, dz * 0.5);
-    if (dy) m.rotation.x = Math.PI / 2;
-    if (dx) m.rotation.y = Math.PI / 2;
-    m.castShadow = true; g.add(m);
+function buildCube() {
+  for (const c of cubies) cubeGroup.remove(c);
+  cubies.length = 0;
+  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+    const g = new THREE.Group(); g.position.set(x, y, z);
+    const body = new THREE.Mesh(bodyGeo, bodyMat); body.castShadow = true; body.receiveShadow = true; g.add(body);
+    const faces = [[x, 1, 0, 0, 'px'], [x, -1, 0, 0, 'nx'], [y, 0, 1, 0, 'py'], [y, 0, -1, 0, 'ny'], [z, 0, 0, 1, 'pz'], [z, 0, 0, -1, 'nz']];
+    for (const [v, dx, dy, dz, key] of faces) {
+      if ((key[0] === 'p' && v !== 1) || (key[0] === 'n' && v !== -1)) continue;
+      const m = new THREE.Mesh(stickGeo, stickMats[key]);
+      m.position.set(dx * 0.5, dy * 0.5, dz * 0.5);
+      if (dy) m.rotation.x = Math.PI / 2;
+      if (dx) m.rotation.y = Math.PI / 2;
+      m.castShadow = true; g.add(m);
+    }
+    g.userData.grid = new THREE.Vector3(x, y, z);
+    cubeGroup.add(g); cubies.push(g);
   }
-  g.userData.grid = new THREE.Vector3(x, y, z);
-  cubeGroup.add(g); cubies.push(g);
 }
+buildCube();
 
 const FACE_DEF = [ // axis is the positive-coordinate axis; base = signed quarter-turn angle (radians base deg) matching cubie.js
   { n: new THREE.Vector3(0, 1, 0),  axis: 'y', layer: 1,  base: -Math.PI / 2, u: new THREE.Vector3(0, 0, -1) }, // U
@@ -171,7 +177,7 @@ function buildFinger(basePos, baseEuler, lens, radii) {
   const tip = new THREE.Group(); tip.position.y = lens[lens.length - 1]; parent.add(tip);
   const pad = new THREE.Mesh(new THREE.SphereGeometry(radii[radii.length - 1] * 1.05, 14, 12), PAD);
   pad.scale.set(1, 0.7, 1.15); tip.add(pad);
-  return { root, joints, tip, rest: joints.map((_, i) => [0.55, 0.85, 0.65][i] || 0.6) };
+  return { root, joints, tip, rest: joints.map((_, i) => [0.42, 0.66, 0.5][i] || 0.55) };
 }
 const FINGERS = {
   index:  buildFinger(new THREE.Vector3(0.63, 1.0, 0.05),  new THREE.Euler(0.06, 0, -0.06), [0.78, 0.6, 0.46], [0.155, 0.14, 0.125]),
@@ -273,7 +279,8 @@ function finishStep() {
   idx++;
   simElapsed += moveDuration(step.m);
   updateNet(); updateMoves(); updateClock();
-  if (C.isSolved(logical) && idx >= seq.length) { setStatus('SOLVED'); log('solved in ' + (seq.length - scrLen) + ' moves'); chime(); flash(); playing = false; $('bPlay').textContent = '▶ PLAY'; }
+  if (idx === scrLen && scrLen > 0 && idx < seq.length) setStatus('SOLVING');
+  if (C.isSolved(logical) && idx >= seq.length) { setStatus('SOLVED · ' + (seq.length - scrLen) + ' MOVES · ' + simElapsed.toFixed(1) + 'S'); log('solved in ' + (seq.length - scrLen) + ' moves'); chime(); flash(); playing = false; $('bPlay').textContent = '▶ PLAY'; }
   step = null;
   if (playing && idx < seq.length) beginStep(seq[idx], idx < scrLen);
   if (playing && idx >= seq.length) { playing = false; $('bPlay').textContent = '▶ PLAY'; }
@@ -350,9 +357,13 @@ function updateMoves() {
     b.textContent = C.MOVE_NAMES[m];
     if (i < idx) b.className = 'done';
     if (i === idx) b.className = 'cur';
-    if (i === scrLen && scrLen > 0) b.style.marginLeft = '8px';
+    if (i === scrLen && scrLen > 0) b.classList.add('seam');
     movesEl.appendChild(b);
   });
+  progFill.style.width = (seq.length ? (idx / seq.length) * 100 : 0).toFixed(1) + '%';
+  const cur = movesEl.querySelector('.cur');
+  if (cur) movesEl.scrollTop = Math.max(0, cur.offsetTop - movesEl.clientHeight / 2 + 10);
+  else movesEl.scrollTop = 0;
 }
 function updateClock() {
   const fmt = (s) => `${String((s / 60) | 0).padStart(2, '0')}:${(s % 60).toFixed(1).padStart(4, '0')}`;
@@ -365,9 +376,35 @@ function flash() {
 }
 
 // ---------- planning + orchestration ----------
-let tables = null;
-S.loadTables('2-tables.bin?v=3').then(t => { tables = t; setStatus('READY'); log('solver tables online (2-phase kociemba)'); })
-  .catch(e => { setStatus('TABLES FAILED'); log('tables.bin failed to load: ' + e.message); });
+let tables = null, tablesLoading = false;
+async function bootTables() {
+  if (tables || tablesLoading) return;
+  tablesLoading = true;
+  try {
+    const res = await fetch('2-tables.bin?v=4');
+    if (!res.ok) throw new Error('fetch tables: ' + res.status);
+    const total = +res.headers.get('content-length') || 4444523;
+    const reader = res.body.getReader();
+    const chunks = []; let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value); got += value.length;
+      setStatus('LOADING SOLVER ' + Math.min(99, Math.round(got / total * 100)) + '%');
+    }
+    const buf = new Uint8Array(got); let o = 0;
+    for (const c of chunks) { buf.set(c, o); o += c.length; }
+    tables = S.loadTablesFromBuffer(buf.buffer);
+    setStatus('READY'); log('solver tables online (2-phase kociemba)');
+  } catch (e) {
+    setStatus('SOLVER OFFLINE — TAP TO RETRY'); log('tables failed to load: ' + e.message);
+  }
+  tablesLoading = false;
+}
+statusEl.style.cursor = 'pointer';
+statusEl.title = 'reload solver tables';
+statusEl.onclick = () => { if (!tables) bootTables(); };
+bootTables();
 
 function plan() {
   setStatus('PLANNING'); log('phase 1: orienting edges + corners…');
@@ -399,26 +436,7 @@ function newRun() {
 }
 function resetCubeVisual() {
   bakePivot(pivot);
-  cubies.sort(() => 0); // keep array
-  // simplest true reset: rebuild each cubie's transform from scratch is complex; instead rebuild scene cube
-  for (const c of cubies) cubeGroup.remove(c);
-  cubies.length = 0;
-  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
-    const g = new THREE.Group(); g.position.set(x, y, z);
-    const body = new THREE.Mesh(bodyGeo, bodyMat); body.castShadow = true; body.receiveShadow = true; g.add(body);
-    const faces = [[x, 1, 0, 0, 'px'], [x, -1, 0, 0, 'nx'], [y, 0, 1, 0, 'py'], [y, 0, -1, 0, 'ny'], [z, 0, 0, 1, 'pz'], [z, 0, 0, -1, 'nz']];
-    for (const [v, dx, dy, dz, key2] of faces) {
-      if ((key2[0] === 'p' && v !== 1) || (key2[0] === 'n' && v !== -1)) continue;
-      const m = new THREE.Mesh(stickGeo, new THREE.MeshPhysicalMaterial({
-        color: CUBE_COLORS[key2], roughness: 0.25, metalness: 0.05, clearcoat: 0.8, clearcoatRoughness: 0.25 }));
-      m.position.set(dx * 0.5, dy * 0.5, dz * 0.5);
-      if (dy) m.rotation.x = Math.PI / 2;
-      if (dx) m.rotation.y = Math.PI / 2;
-      m.castShadow = true; g.add(m);
-    }
-    g.userData.grid = new THREE.Vector3(x, y, z);
-    cubeGroup.add(g); cubies.push(g);
-  }
+  buildCube();
 }
 function toSolvedInstant() {
   // jump to end state: apply remaining moves instantly
@@ -430,8 +448,12 @@ function toSolvedInstant() {
 }
 
 // buttons
-$('bGo').onclick = () => { $('start').classList.add('hidden'); controls.autoRotate = false; audio(); newRun(); };
-$('bNew').onclick = () => { if (!tables) return; newRun(); };
+$('bGo').onclick = () => {
+  audio();
+  if (!tables) { bootTables(); const w = setInterval(() => { if (tables) { clearInterval(w); $('bGo').click(); } }, 200); return; }
+  $('start').classList.add('hidden'); controls.autoRotate = false; newRun();
+};
+$('bNew').onclick = () => { if (!tables) { bootTables(); return; } newRun(); };
 $('bPlay').onclick = () => {
   if (!seq.length) return;
   if (step || idx < seq.length) {
@@ -505,6 +527,19 @@ $('bCam').onclick = () => {
   camTween = { from: camera.position.clone(), to: controls.target.clone().add(dir.multiplyScalar(r)), t: 0 };
 };
 $('bMute').onclick = () => { muted = !muted; $('bMute').textContent = muted ? 'SOUND OFF' : 'SOUND ON'; };
+$('bStats').onclick = () => document.body.classList.toggle('panel-open');
+addEventListener('keydown', (e) => {
+  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+  if (e.code === 'Space') { e.preventDefault(); ($('start').classList.contains('hidden') ? $('bPlay') : $('bGo')).click(); }
+  else if (e.key === 'ArrowRight') $('bNext').click();
+  else if (e.key === 'ArrowLeft') $('bPrev').click();
+  else if (e.key === 'n' || e.key === 'N') $('bNew').click();
+  else if (e.key === 'm' || e.key === 'M') $('bMute').click();
+  else if (e.key === 'c' || e.key === 'C') $('bCam').click();
+  else if (e.key === 'r' || e.key === 'R') $('bRestart').click();
+});
 
 // ---------- main loop ----------
 let camTween = null;
