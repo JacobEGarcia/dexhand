@@ -39,7 +39,7 @@
   #moves b.seam { margin-left: 8px; position: relative; }
   #moves b.seam::before { content: ""; position: absolute; left: -6px; top: -2px; bottom: -2px; width: 1px; background: var(--line); }
   #bar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 8px;
-    max-width: min(96vw, 860px); overflow-x: auto; scrollbar-width: none;
+    max-width: min(96vw, 960px); overflow-x: auto; scrollbar-width: none;
     background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 10px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   #bar::-webkit-scrollbar { display: none; }
   #progress { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: rgba(255,255,255,.06); }
@@ -65,7 +65,7 @@
   footer { position: fixed; bottom: 24px; right: 26px; z-index: 4; color: var(--dim); font-size: 10.5px; letter-spacing: .08em; text-align: right; }
   footer a { color: #6fd8c6; text-decoration: none; }
   footer a:hover { text-decoration: underline; }
-  @media (max-width: 1180px) { #hint, footer { display: none; } }
+  @media (max-width: 1420px) { #hint, footer { display: none; } }
   @media (max-width: 900px) {
     header { top: 14px; left: 16px; }
     header h1 { font-size: 20px; }
