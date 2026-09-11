@@ -65,7 +65,7 @@ controls.minDistance = 3.5; controls.maxDistance = 20;
 controls.target.set(0, 0.2, 0);
 function fitCamera() { // pull back on narrow/portrait screens so the cube + hand stay framed
   const a = innerWidth / innerHeight;
-  const r = 10.6 * THREE.MathUtils.clamp(1.1 / a, 1, 1.8);
+  const r = 10.6 * THREE.MathUtils.clamp(1.1 / a, 1, 1.5);
   const dir = camera.position.clone().sub(controls.target).normalize();
   camera.position.copy(controls.target).add(dir.multiplyScalar(r));
 }
